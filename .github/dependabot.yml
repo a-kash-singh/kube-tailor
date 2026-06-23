@@ -7,9 +7,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "go"
 
   # Keep GitHub Actions up to date
   - package-ecosystem: "github-actions"
@@ -18,9 +15,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "github-actions"
 
   # Keep Docker base image up to date
   - package-ecosystem: "docker"
@@ -29,6 +23,3 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "docker"
