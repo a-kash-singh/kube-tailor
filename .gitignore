@@ -1,0 +1,7 @@
+# Generated TLS secret (see gen-certs.sh)
+webhook.tls.secret.yaml
+
+# Local Go caches / toolchain downloads
+.gomodcache/
+.gocache/
+.local-go/
