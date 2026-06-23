@@ -3,7 +3,7 @@ module github.com/a-kash-singh/kube-tailor
 go 1.24.0
 
 require (
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	github.com/wI2L/jsondiff v0.7.1
 	k8s.io/api v0.27.2
@@ -37,7 +37,7 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
-	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
