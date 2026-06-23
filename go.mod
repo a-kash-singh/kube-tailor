@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/sirupsen/logrus v1.9.2
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.11.1
 	github.com/wI2L/jsondiff v0.3.0
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
