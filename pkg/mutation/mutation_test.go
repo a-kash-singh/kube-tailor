@@ -60,10 +60,6 @@ func TestMutatePodPatchInjectsResources(t *testing.T) {
 	require.NotEqual(t, "[]", string(got))
 }
 
-func NewMutatorWithClient(logger *logrus.Entry, client KubeClient) *Mutator {
-	return &Mutator{Logger: logger, Client: client}
-}
-
 func logger() *logrus.Entry {
 	mute := logrus.StandardLogger()
 	mute.Out = ioutil.Discard

@@ -54,6 +54,28 @@ func NodeCapacityFromNode(node *corev1.Node) (NodeCapacity, error) {
 	return capacity, nil
 }
 
+// ValidateForConfig checks that the capacity has the data required by cfg.
+// Call this immediately after NodeCapacityFromNode, before any calculation,
+// so errors surface with a clear message rather than a generic "no capacity" error
+// two frames deep into applyInjectionConfig.
+func (c NodeCapacity) ValidateForConfig(cfg InjectionConfig) error {
+	if cfg.CPUPercent != nil && c.milliCPU == nil {
+		return fmt.Errorf(
+			"cpu-percent is configured but node has no CPU capacity: "+
+				"missing %q label and no status.capacity entry",
+			karpenterInstanceCPULabel,
+		)
+	}
+	if cfg.MemoryPercent != nil && c.memoryMi == nil {
+		return fmt.Errorf(
+			"memory-percent is configured but node has no memory capacity: "+
+				"missing %q label and no status.capacity entry",
+			karpenterInstanceMemoryLabel,
+		)
+	}
+	return nil
+}
+
 func (c NodeCapacity) MilliCPUValue() (int64, error) {
 	if c.milliCPU == nil {
 		return 0, fmt.Errorf("node has no CPU capacity information")

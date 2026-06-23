@@ -14,13 +14,20 @@ type Mutator struct {
 	Client KubeClient
 }
 
-// NewMutator returns an initialised instance of Mutator
+// NewMutator returns a Mutator that creates its own live Kubernetes client.
+// Suitable for local development. In-cluster deployments should use
+// NewMutatorWithClient with a cache-backed client from NewKubeClientFromConfig.
 func NewMutator(logger *logrus.Entry) *Mutator {
 	client, err := NewKubeClient()
 	if err != nil {
 		logger.WithError(err).Warn("failed to create kubernetes client; resource injection disabled")
 	}
+	return &Mutator{Logger: logger, Client: client}
+}
 
+// NewMutatorWithClient returns a Mutator using the provided KubeClient.
+// Use this when the caller manages the client lifecycle (e.g. with informer caches).
+func NewMutatorWithClient(logger *logrus.Entry, client KubeClient) *Mutator {
 	return &Mutator{Logger: logger, Client: client}
 }
 
