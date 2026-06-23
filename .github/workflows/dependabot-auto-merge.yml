@@ -17,6 +17,32 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # fetch-metadata returns 0 for semver-major bumps by convention regardless
+      # of real-world compatibility. The actual score lives in the badge URL that
+      # Dependabot embeds in the PR body — parse it from there instead.
+      - name: Resolve real compatibility score
+        id: score
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_BODY=$(gh api /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} --jq '.body // ""')
+
+          BADGE_URL=$(printf '%s' "$PR_BODY" \
+            | grep -oE 'https://dependabot-badges\.githubapp\.com/badges/compatibility_score\?[^)]+' \
+            | head -1)
+
+          SCORE="${{ steps.metadata.outputs.compatibility-score }}"
+
+          if [ -n "$BADGE_URL" ]; then
+            FETCHED=$(curl -sf "$BADGE_URL" 2>/dev/null \
+              | grep -oE '[0-9]+%' \
+              | head -1 \
+              | tr -d '%')
+            [ -n "$FETCHED" ] && SCORE="$FETCHED"
+          fi
+
+          echo "value=${SCORE:-0}" >> "$GITHUB_OUTPUT"
+
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v5
         with:
@@ -30,12 +56,12 @@ jobs:
             | Package | `${{ steps.metadata.outputs.dependency-names }}` |
             | Ecosystem | `${{ steps.metadata.outputs.package-ecosystem }}` |
             | Update type | `${{ steps.metadata.outputs.update-type }}` |
-            | Compatibility score | `${{ steps.metadata.outputs.compatibility-score }}%` |
+            | Compatibility score | `${{ steps.score.outputs.value }}%` |
 
-            ${{ steps.metadata.outputs.compatibility-score >= 90 && '✅ Compatibility ≥ 90% — this PR will be **auto-merged** once all checks pass.' || '⚠️ Compatibility < 90% — manual review required before merging.' }}
+            ${{ fromJSON(steps.score.outputs.value) >= 90 && '✅ Compatibility ≥ 90% — this PR will be **auto-merged** once all checks pass.' || '⚠️ Compatibility < 90% — manual review required before merging.' }}
 
       - name: Enable auto-merge for high-compatibility updates
-        if: steps.metadata.outputs.compatibility-score >= 90
+        if: fromJSON(steps.score.outputs.value) >= 90
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
