@@ -75,7 +75,6 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          push: true
           # image name must be in outputs when pushing by digest (no tag yet)
           outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
