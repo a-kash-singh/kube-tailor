@@ -1,0 +1,42 @@
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### Dependabot update summary
+
+            | Field | Value |
+            |---|---|
+            | Package | `${{ steps.metadata.outputs.dependency-names }}` |
+            | Ecosystem | `${{ steps.metadata.outputs.package-ecosystem }}` |
+            | Update type | `${{ steps.metadata.outputs.update-type }}` |
+            | Compatibility score | `${{ steps.metadata.outputs.compatibility-score }}%` |
+
+            ${{ steps.metadata.outputs.compatibility-score >= 90 && '✅ Compatibility ≥ 90% — this PR will be **auto-merged** once all checks pass.' || '⚠️ Compatibility < 90% — manual review required before merging.' }}
+
+      - name: Enable auto-merge for high-compatibility updates
+        if: steps.metadata.outputs.compatibility-score >= 90
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

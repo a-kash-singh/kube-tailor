@@ -2,26 +2,34 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/a-kash-singh/kube-tailor/pkg/admission"
+	"github.com/a-kash-singh/kube-tailor/pkg/mutation"
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 func main() {
 	setLogger()
 
-	// handle our core application
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	mutator := buildMutator(ctx)
+
 	http.HandleFunc("/validate-pods", ServeValidatePods)
-	http.HandleFunc("/mutate-pods", ServeMutatePods)
+	http.HandleFunc("/mutate-pods", serveMutatePods(mutator))
 	http.HandleFunc("/health", ServeHealth)
 
-	// start the server
-	// listens to clear text http on port 8080 unless TLS env var is set to "true"
 	if os.Getenv("TLS") == "true" {
 		cert := "/etc/admission-webhook/tls/tls.crt"
 		key := "/etc/admission-webhook/tls/tls.key"
@@ -31,6 +39,39 @@ func main() {
 		logrus.Print("Listening on port 8080...")
 		logrus.Fatal(http.ListenAndServe(":8080", nil))
 	}
+}
+
+// buildMutator creates a shared Mutator backed by an informer cache.
+// If an in-cluster config is unavailable (local dev), it falls back to a
+// mutator that will log a warning and skip resource injection.
+func buildMutator(ctx context.Context) *mutation.Mutator {
+	logger := logrus.WithField("component", "startup")
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		logger.WithError(err).Warn("not running in-cluster; resource injection will be disabled")
+		return mutation.NewMutator(logrus.NewEntry(logrus.StandardLogger()))
+	}
+
+	client, factory, err := mutation.NewKubeClientFromConfig(config)
+	if err != nil {
+		logger.WithError(err).Fatal("failed to build Kubernetes client")
+	}
+
+	factory.Start(ctx.Done())
+
+	logger.Info("waiting for informer cache to sync...")
+	synced := cache.WaitForCacheSync(
+		ctx.Done(),
+		factory.Core().V1().Nodes().Informer().HasSynced,
+		factory.Apps().V1().DaemonSets().Informer().HasSynced,
+	)
+	if !synced {
+		logger.Fatal("informer cache failed to sync — shutting down")
+	}
+	logger.Info("informer cache ready")
+
+	return mutation.NewMutatorWithClient(logrus.NewEntry(logrus.StandardLogger()), client)
 }
 
 // ServeHealth returns 200 when things are good
@@ -65,46 +106,41 @@ func ServeValidatePods(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	jout, err := json.Marshal(out)
-	if err != nil {
-		e := fmt.Sprintf("could not parse admission response: %v", err)
-		logger.Error(e)
-		http.Error(w, e, http.StatusInternalServerError)
-		return
-	}
-
-	logger.Debug("sending response")
-	logger.Debugf("%s", jout)
-	fmt.Fprintf(w, "%s", jout)
+	writeAdmissionResponse(w, logger, out)
 }
 
-// ServeMutatePods returns an admission review with pod mutations as a json patch
-// in the review response
-func ServeMutatePods(w http.ResponseWriter, r *http.Request) {
-	logger := logrus.WithField("uri", r.RequestURI)
-	logger.Debug("received mutation request")
+// serveMutatePods returns an HTTP handler that uses the shared mutator.
+func serveMutatePods(mutator *mutation.Mutator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logrus.WithField("uri", r.RequestURI)
+		logger.Debug("received mutation request")
 
-	in, err := parseRequest(*r)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		in, err := parseRequest(*r)
+		if err != nil {
+			logger.Error(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		adm := admission.Admitter{
+			Logger:  logger,
+			Request: in.Request,
+			Mutator: mutator,
+		}
+
+		out, err := adm.MutatePodReview()
+		if err != nil {
+			e := fmt.Sprintf("could not generate admission response: %v", err)
+			logger.Error(e)
+			http.Error(w, e, http.StatusInternalServerError)
+			return
+		}
+
+		writeAdmissionResponse(w, logger, out)
 	}
+}
 
-	adm := admission.Admitter{
-		Logger:  logger,
-		Request: in.Request,
-	}
-
-	out, err := adm.MutatePodReview()
-	if err != nil {
-		e := fmt.Sprintf("could not generate admission response: %v", err)
-		logger.Error(e)
-		http.Error(w, e, http.StatusInternalServerError)
-		return
-	}
-
+func writeAdmissionResponse(w http.ResponseWriter, logger *logrus.Entry, out *admissionv1.AdmissionReview) {
 	w.Header().Set("Content-Type", "application/json")
 	jout, err := json.Marshal(out)
 	if err != nil {
@@ -113,7 +149,6 @@ func ServeMutatePods(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, e, http.StatusInternalServerError)
 		return
 	}
-
 	logger.Debug("sending response")
 	logger.Debugf("%s", jout)
 	fmt.Fprintf(w, "%s", jout)

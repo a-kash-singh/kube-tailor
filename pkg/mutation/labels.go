@@ -12,7 +12,4 @@ const (
 	LabelMemoryMin     = LabelPrefix + "memory-min"
 	LabelMemoryMax     = LabelPrefix + "memory-max"
 	LabelTargetedContainers = LabelPrefix + "targetted-containers"
-
-	LabelLifespanRequested   = LabelPrefix + "lifespan-requested"
-	TaintKeyLifespanRemaining = LabelPrefix + "lifespan-remaining"
 )

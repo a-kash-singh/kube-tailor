@@ -21,6 +21,9 @@ import (
 type Admitter struct {
 	Logger  *logrus.Entry
 	Request *admissionv1.AdmissionRequest
+	// Mutator is the shared mutator instance. If nil, a new one is created per
+	// request using live API calls (suitable for local dev only).
+	Mutator *mutation.Mutator
 }
 
 // MutatePodReview takes an admission request and mutates the pod within,
@@ -33,7 +36,10 @@ func (a Admitter) MutatePodReview() (*admissionv1.AdmissionReview, error) {
 		return allowReviewResponse(a.Request.UID, "pod parse failed, allowed without mutation"), nil
 	}
 
-	m := mutation.NewMutator(a.Logger)
+	m := a.Mutator
+	if m == nil {
+		m = mutation.NewMutator(a.Logger)
+	}
 	patch, err := m.MutatePodPatch(pod)
 	if err != nil {
 		a.Logger.WithError(err).Warn("could not mutate pod, allowing admission without mutation")

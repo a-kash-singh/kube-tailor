@@ -97,6 +97,9 @@ func (se injectDsRes) Mutate(pod *corev1.Pod) (*corev1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := capacity.ValidateForConfig(cfg); err != nil {
+		return nil, fmt.Errorf("node %q: %w", nodeName, err)
+	}
 
 	se.Logger = se.Logger.WithFields(logrus.Fields{
 		"mutation":   se.Name(),
