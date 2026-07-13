@@ -1,4 +1,4 @@
-FROM golang:1.24.0 AS build
+FROM golang:1.26.5 AS build
 
 ARG GOOS
 ARG GOARCH
