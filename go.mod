@@ -3,7 +3,7 @@ module github.com/a-kash-singh/kube-tailor
 go 1.26.0
 
 require (
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.10.0
 	github.com/stretchr/testify v1.11.1
 	github.com/wI2L/jsondiff v0.7.1
 	k8s.io/api v0.36.3
